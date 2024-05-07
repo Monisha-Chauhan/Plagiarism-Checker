@@ -1,0 +1,84 @@
+import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+student_files=[doc for doc in os.listdir() if doc.endswith('.txt')]
+student_files
+student_notes=[open(_file,encoding='utf-8').read() for _file in student_files]
+student_notes
+def vectorize(text):
+    return TfidfVectorizer().fit_transform(text).toarray()
+def similarity(doc1,doc2):
+    return cosine_similarity([doc1,doc2])
+vectors=vectorize(student_notes)
+vectors
+s_vectors=list(zip(student_files,vectors))
+s_vectors
+plagiarism_results=set()
+def check_plagiarism():
+    plagiarism_results = set()
+
+    for i, (student_a, text_vector_a) in enumerate(s_vectors):
+        new_vectors = s_vectors[i+1:]  # Start from the next student to avoid duplicate comparisons
+
+        for student_b, text_vector_b in new_vectors:
+            sim_score = similarity(text_vector_a, text_vector_b)[0][1]
+            student_pair = sorted((student_a, student_b))
+            score = (student_pair[0], student_pair[1], sim_score)
+            plagiarism_results.add(score)
+
+    # Sort the results based on similarity scores (in descending order)
+    sorted_results = sorted(plagiarism_results, key=lambda x: x[2], reverse=True)
+
+    return sorted_results
+
+for result in check_plagiarism():
+    student1, student2, sim_score = result
+    print(f"Projects: {student1} and {student2} - Similarity Score: {sim_score:.2f}")
+
+
+import matplotlib.pyplot as plt
+
+# Call the check_plagiarism function to get the sorted results
+results = check_plagiarism()
+
+# Extract data for the bar chart
+student_pairs = [(result[0], result[1]) for result in results]
+similarity_scores = [result[2] for result in results]
+
+# Define the threshold
+threshold = 0.3
+
+# Create a horizontal bar chart with swapped axes
+plt.figure(figsize=(10, 6))
+bar_colors = ['skyblue' if score <= threshold else 'lightcoral' for score in similarity_scores]
+
+# Define emojis for acceptance and rejection with larger font size
+accept_emoji = '😃'  # Happy emoji
+reject_emoji = '😞'  # Sad emoji
+# Add emojis with larger font size to the labels based on acceptance/rejection
+labels_with_emojis = [
+    f"{pair[0]} and {pair[1]} {accept_emoji}" if score <= threshold else f"{pair[0]} and {pair[1]} {reject_emoji}"
+    for pair, score in zip(student_pairs, similarity_scores)
+]
+
+bars = plt.barh(range(len(student_pairs)), similarity_scores, tick_label=labels_with_emojis, color=bar_colors)
+plt.ylabel('Project Pairs', fontsize=14)
+plt.xlabel('Similarity Score', fontsize=14)
+plt.title('Plagiarism Detection Results', fontsize=16)
+
+# Add a red line to indicate the threshold
+plt.axvline(x=threshold, color='red', linestyle='--', label=f'Threshold ({threshold})', linewidth=2)
+
+# Add percentage values on the right of each bar
+for bar, score in zip(bars, similarity_scores):
+  plt.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2, f'{score:.2%}', va='center', fontsize=10)
+
+plt.grid(axis='x', linestyle='--', alpha=0.7)
+plt.xlim(0, 1)  # Customize the x-axis limits
+
+# Show the legend
+plt.legend()
+
+# Show the graph
+plt.tight_layout()
+plt.show()
